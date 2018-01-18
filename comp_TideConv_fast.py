@@ -2,7 +2,7 @@
 from __future__ import print_function
 import numpy as np
 import scipy.interpolate as itp
-import scipy.signal as sig
+#import scipy.signal as sig
 import scipy.stats as stats
 from netCDF4 import Dataset
 #from SW_Density import SW_Density as rhop # temporary
@@ -14,7 +14,7 @@ from comp_rho import rhop
 from datetime import datetime
 from change_coord import reproject_image_into_polar
 from mpi4py import MPI 
-from pad_coords import pad_coords   # padding fields outside of domain
+#from pad_coords import pad_coords   # padding fields outside of domain
 from detrend_2d import detrend_2d   # bilinear detrend
 import time
 clock  = datetime.now()
@@ -79,8 +79,8 @@ M2         = 2.*np.pi/(44700.) # M2 tide frequency [rad s-1]
 Erad = 6371e3                  # Earth radius [m]
 
 ### warning: make sure the following lines are in agreement with subsequent parameters and grids
-nxout = 256
-nxoth = 128
+nxout = 256     # grid size for |k| magnitude 
+nxoth = 128     # grid size for theta (angle k)
 khout = np.linspace(1./Lchk,1./750/np.sqrt(2.),nxout)*np.pi  # k adim for output = k*bar(N)*H/sqrt(M2^2-f^2)
 thout = np.linspace(0,np.pi*2,nxoth+1)[:-1]  # theta for output
 
