@@ -1,3 +1,4 @@
+
 # coding: utf-8
 
 # # comp_TideConv_tpxo
@@ -13,7 +14,6 @@
 # Originally, [St. Laurent & Garrett 2002] is relevant for "weak" topography and no important variations of tide and bathymetry. Here, we implicetely assume that tidal constituents are "frozen" at every points. Besides, finite-depth effect are taken into account by using a finite lower bound of integration in the spectral space (roughly corresponding to mode 1), which is taken constant here (whereas variations of kh_1 scales like 1/H)
 # 
 
-from __future__ import print_function
 import numpy as np
 import scipy.interpolate as interp
 #import scipy.signal as sig
@@ -35,7 +35,7 @@ comm = MPI.COMM_WORLD
 doverb = True
 
 # --- MPI parameters --- 
-npx,npy = 2,2  # number of processors in x and y directions  
+npx,npy = 2,2 # number of processors in x and y directions  
 #npx,npy = 1,1 # number of processors in x and y directions  
 
 rank = comm.Get_rank()
@@ -194,18 +194,19 @@ else:
 f = 2*omega*np.sin(lat2d*np.pi/180.) 
 
 # ------ extract Tides ------------------------------
+
 if tide=='lucky' and collot and colloc:
     nc   = Dataset(uname,'r')
     phi = np.deg2rad(nc.variables['tide_Cangle'][0,...].T[ix[0]:ix[1]:nstep,jy[0]:jy[1]:nstep][imin:imax,jmin:jmax])
+    # N.B.: maybe the sign is wrong (I assume count positive cc-wise with E as origin)
     pha = np.deg2rad(nc.variables['tide_Cphase'][0,...].T[ix[0]:ix[1]:nstep,jy[0]:jy[1]:nstep][imin:imax,jmin:jmax])
     ue = nc.variables['tide_Cmax'][0,...].T[ix[0]:ix[1]:nstep,jy[0]:jy[1]:nstep][imin:imax,jmin:jmax]
     ve = nc.variables['tide_Cmin'][0,...].T[ix[0]:ix[1]:nstep,jy[0]:jy[1]:nstep][imin:imax,jmin:jmax]
-    phi -= angrid    # TODO check this
     nc.close()
 elif tide=='tpxo8':
-    ue, ve, phi, pha = get_tpxo_on_grid([uname,hname],lon2d,lat2d,return_ellipse=True,grang=angrid)
+    ue, ve, phi, pha = get_tpxo_on_grid([uname,hname],lon2d,lat2d,return_ellipse=True)
 
-phi = phi*np.pi/180  # angle between major axis and East  [rad] (beware sign)
+phi = np.deg2rad(phi)  # angle between major axis and East  [rad] (beware sign)
 
 # ------ extract density profile, compute N2 (horizontally homogeneous) ------------------
 if clim == "lucky":
@@ -226,9 +227,10 @@ for ii in indneg:
     N2_tmp[ii] = (N2_tmp[ii-1] + N2_tmp[ii+1])/2
 fN2 = interp.pchip(zz[::-1],N2_tmp,extrapolate=True)    
 
+
 # fit exponential profile
 slope,intercept,r_val,p_val,std_err = stats.linregress(zz,np.log(N2_tmp**0.5))
-N0  = np.exp(intercept)/(2*np.pi)
+N0  = np.exp(intercept)
 b   = 1./slope
 
 if doverb:
@@ -237,7 +239,12 @@ if doverb:
     print('exponential interpolation for stratification: N0={0}, b={1}'.format(N0,b))
 
 # ------ prepare netcdf file and store "fix" variables---------------------------
+
 ncw = Dataset(path_write+file_write,'w')
+
+# global attributes
+ncw.created = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+ncw.generating_script = sys.argv[0]
 
 ncw.createDimension('z',zz.size)
 ncw.createDimension('lon',nlon)
@@ -245,33 +252,66 @@ ncw.createDimension('lat',nlat)
 ncw.createDimension('kh',nxout)
 ncw.createDimension('theta',nxoth)
 #ncw.createDimension('nmodes',nmodes)
-ncw.createVariable('z','f',('z',))
-ncw.createVariable('N2z','f',('z'))
-ncw.createVariable('lon','f',('lat','lon'))
-ncw.createVariable('lat','f',('lat','lon'))
-ncw.createVariable('h','f',('lat','lon'))
-ncw.createVariable('ue','f',('lat','lon'))
+ncvar = ncw.createVariable('z','f',('z',))
+ncvar.long_name = "depth"
+ncvar.properties = "algebraic, negative downward, 0 at surface"
+ncvar.units  = "m"
+ncvar = ncw.createVariable('N2z','f',('z'))
+ncvar.units = "s^{-2}"
+ncvar.long_name = "Brunt-Vaisala frequency squared"
+ncvar.properties = "vertical profile"
+ncvar = ncw.createVariable('lon','f',('lat','lon'))
+ncvar.units = "degres E"
+ncvar.long_name = "longitude"
+ncvar = ncw.createVariable('lat','f',('lat','lon'))
+ncvar.units = "degres N"
+ncvar.long_name = "latitude"
+ncvar = ncw.createVariable('h','f',('lat','lon'))
+ncvar.units = "m"
+ncvar.long_name = "depth of bottom"
+ncvar.properties = "negative"
+ncvar = ncw.createVariable('ue','f',('lat','lon'))
+ncvar.units = 'm/s'
+ncvar.long_name = "major tidal ellipse amplitude"
 ncw.createVariable('ve','f',('lat','lon'))
+ncvar.units = 'm/s'
+ncvar.long_name = "minor tidal ellipse amplitude"
 var = ncw.createVariable('phi','f',('lat','lon'))
-var.long_name = 'angle between ellipse major-axis and x-axis'
+var.long_name = 'angle between ellipse major-axis and E-axis'
 var.units = 'deg'
-ncw.createVariable('N2b','f',('lat','lon'))
-ncw.createVariable('N0','f',()) # works even if N0 and b are constant 
+var.properties = "positive counterclockwise with East-axis as origin"
+var = ncw.createVariable('lambda1','f',('lat','lon'))
+var.long_name = 'equivalent mode 1 horizontal wavelength'
+var.units = 'km'
+var = ncw.createVariable('N2b','f',('lat','lon'))
+var.units = "s^{-2}"
+var.long_name = "N^2 at bottom"
+var = ncw.createVariable('N0','f',()) # works even if N0 and b are constant 
+var.units = "s^{-1}"
+var.long_name = "Exponential fit of N(z)=N0.exp(-z/b)"
 ncw.createVariable('b','f',())
-ncw.createVariable('f','f',('lat','lon'))
+var = ncw.createVariable('f','f',('lat','lon'))
+var.units = "rad/s"
+var.long_name = "Coriolis frequency"
 ncw.createVariable('kh','f',('kh'))
+var.units = "rad/m"
 var.long_name = 'equivalent mode number'
 var = ncw.createVariable('theta','f',('theta'))
 var.longname = "wave-vector angle"
 var.units = "rad"
 var = ncw.createVariable('Ef','f',('lat','lon','kh','theta')) # case 1 
-var.long_name = 'Energy flux (lat,lon,K,theta)'                 # case 1 
+var.units = "W"
+var.long_name = 'Vertical energy flux spectral density'                 # case 1 
 var = ncw.createVariable('Ef_a','f',('lat','lon','kh'))         # case 2 
-var.long_name = 'Azimuthally-averaged energy flux (lat,lon,K)'   # case 2 
+var.long_name = 'Azimuthally-averaged spectral density of vertical energy flux'   # case 2 
+var.units = "W/m"
 var = ncw.createVariable('Ef_t','f',('lat','lon'))
-var.long_name = 'Total energy flux (lat,lon)'
+var.long_name = 'Vertical energy flux'
+var.units = "W/m^2"
 var = ncw.createVariable('h_sp','f',('lat','lon','kh','theta'))
-var.long_name = 'Local spectrum of topography (lat,lon,K,theta)'
+var.long_name = 'Normalized local spectrum'
+var.units = "m^4"
+
 ncw.variables['z'][:]      = zz
 ncw.variables['N2z'][:]    = N2_tmp
 ncw.variables['lon'][:]    = lon2d.T
@@ -296,7 +336,7 @@ for j in range(nlat): #
     hour,sec = divmod(clock_diff.seconds,3600)
     hour     = hour + clock_diff.days*24
     minu,sec = divmod(sec,60)
-    print( ' ---> proc %.3i, time spent : %.2i h %.2i min %.2i sec, computation is at %.1f percent'%(rank,hour,minu,sec,float(j)/nlat*100.)) 
+    print( ' ---> proc %.3i, time spent : %.2i h %.2i min %.2i sec, computation is at %.1f percent'          %(rank,hour,minu,sec,float(j)/nlat*100.)) 
     for i in range(nlon): #
         xpos, ypos = lon2d[i,j], lat2d[i,j]
         ix, jy = np.unravel_index( ((lon_h-xpos)**2 + (lat_h-ypos)**2).argmin() , (nlon_h,nlat_h))
@@ -365,9 +405,9 @@ for j in range(nlat): #
         kx2d,ky2d = np.meshgrid(kx,kx)
         sp[np.where(np.logical_and(kx2d==0,ky2d==0))] = np.nan # remove continuous component
         
-        sp_polar, r, theta = reproject_image_into_polar(sp.T,origin=(nx//2,nx//2),theta_shift=-(phi[i,j]-angrid[i,j]))
+        sp_polar, r, theta = reproject_image_into_polar(sp.T,origin=(nx//2,nx//2),theta_shift=(phi[i,j]+angrid[i,j]))
         kh = r*dk # r is in pixel, multiply by dk to get wavenumber
-        sp_polar[r==0]=np.nan
+        sp_polar[r==0] = np.nan
 
         weight = ( ue[i,j]**2*np.cos(theta)**2 + ve[i,j]**2*np.sin(theta)**2 )
         gamma = sp_polar*weight[None,:]*kh[:,None]
@@ -383,7 +423,8 @@ for j in range(nlat): #
         Ef_a = np.nansum(Ef*dtheta,axis=1)*kh/(2*np.pi)
 
         # --- equivalent mode number Eq (6) in StL and G 2002 ---  
-        k1 = np.pi*(M2**2-f[i,j]**2)**0.5/(b*N0) # Eq (6), H neglected
+        #k1 = np.pi*(M2**2-f[i,j]**2)**0.5/(b*N0) # Eq (6), H neglected
+        k1 = np.pi*np.sqrt(M2**2-f[i,j])/(b*N0*(1-np.exp(hgrid[i,j]/b)))
         dkj = k1 
         
         try:   
@@ -397,14 +438,13 @@ for j in range(nlat): #
         ncvar['Ef_t'][j,i] = np.nansum(Ef_a[kmin_int:]*dk) # total NRJ flux
         ncvar['h_sp'][j,i,:,:] = interp.RectBivariateSpline(kh,theta,sp_polar,kx=1,ky=1)(khout,thout) # spectrum of topography
         ncvar['N2b'][j,i]    = N2b
-# ------ end of loop: print timing ---------------------------
+        ncvar['lambda1'][j,i] = 2*np.pi/k1/1e3
+# ------ end of loop: print timing at the beginning ---------------------------
 ncw.close()
 
 clock_diff = datetime.now() - clock
 hour,sec = divmod(clock_diff.seconds,3600)
 hour     = hour + clock_diff.days*24
 minu,sec = divmod(sec,60)
-print(' ===> proc %.3i, time spent : %.2i h %.2i min %.2i sec, save in netcdf file '      %(rank,hour,minu,sec)) 
-
-ncw.close()
+print(' ===> proc %.3i, time spent : %.2i h %.2i min %.2i sec'%(rank,hour,minu,sec)) 
 
