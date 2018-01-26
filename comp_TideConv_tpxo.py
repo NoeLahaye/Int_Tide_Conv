@@ -15,6 +15,7 @@
 # 
 
 import numpy as np
+import sys
 import scipy.interpolate as interp
 #import scipy.signal as sig
 import scipy.stats as stats
@@ -35,7 +36,7 @@ comm = MPI.COMM_WORLD
 doverb = True
 
 # --- MPI parameters --- 
-npx,npy = 2,2 # number of processors in x and y directions  
+npx,npy = 4,1 # number of processors in x and y directions  
 #npx,npy = 1,1 # number of processors in x and y directions  
 
 rank = comm.Get_rank()
@@ -403,11 +404,11 @@ for j in range(nlat): #
         sp = norm*abs(np.fft.fftshift(np.fft.fft2(h*win)))**2
         sp = sp*np.nanvar(h)/np.sum(sp*dk*dk)
         kx2d,ky2d = np.meshgrid(kx,kx)
-        sp[np.where(np.logical_and(kx2d==0,ky2d==0))] = np.nan # remove continuous component
+        sp[np.where(np.logical_and(kx2d==0,ky2d==0))] = 0 # remove continuous component
         
         sp_polar, r, theta = reproject_image_into_polar(sp.T,origin=(nx//2,nx//2),theta_shift=(phi[i,j]+angrid[i,j]))
         kh = r*dk # r is in pixel, multiply by dk to get wavenumber
-        sp_polar[r==0] = np.nan
+        sp_polar[r==0,:] = np.nan
 
         weight = ( ue[i,j]**2*np.cos(theta)**2 + ve[i,j]**2*np.sin(theta)**2 )
         gamma = sp_polar*weight[None,:]*kh[:,None]
@@ -424,7 +425,7 @@ for j in range(nlat): #
 
         # --- equivalent mode number Eq (6) in StL and G 2002 ---  
         #k1 = np.pi*(M2**2-f[i,j]**2)**0.5/(b*N0) # Eq (6), H neglected
-        k1 = np.pi*np.sqrt(M2**2-f[i,j])/(b*N0*(1-np.exp(hgrid[i,j]/b)))
+        k1 = np.pi*np.sqrt(M2**2-f[i,j]**2)/(b*N0*(1-np.exp(hgrid[i,j]/b)))
         dkj = k1 
         
         try:   

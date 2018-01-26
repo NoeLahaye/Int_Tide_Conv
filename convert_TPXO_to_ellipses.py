@@ -62,9 +62,9 @@ def cmp2ap(re,im):
 
 def get_tpxo_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
     """ read TPXO8 files (filenames=[ufile,hfile]) and interpolate it on lonr, latr grid
-    if return_ellipse is True: return ellipse components (angles in radian), 
+    if return_ellipse is True: ellipse components (SEMA, SEMI, INC, PHA -- angles in radian), 
     otherwise return amplitude, phase for u, v
-    if grang != None, rotate field by angle grang (radians)"""
+    if grang != None, rotate field by angle grang """
     uname, hname = filenames
 
     nc = Dataset(uname,'r')
@@ -108,11 +108,11 @@ def get_tpxo_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
     if return_ellipse:
         ua, up = cmp2ap(ure,uim)
         va, vp = cmp2ap(vre,vim)
-        sema, ecc, inc, pha = ellipse(ua,up,va,vp)    
+        sema, ecc, inc, pha = ellipse(ua,up,va,vp)    # that is really sema, ecc, inc, pha
         inc, pha = np.deg2rad(inc), np.deg2rad(pha)
         if grang is not None:
-            inc += grang
-        return sema, ecc, inc, pha
+            va -= grang
+        return sema, ecc*sema, inc, pha
     else:
         if grang is not None:
             ure, vre = rot_uv(ure,vre,grang)
