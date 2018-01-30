@@ -60,7 +60,98 @@ def cmp2ap(re,im):
     return np.abs(re+1j*im),np.arctan2(-im,re)*180/np.pi
 
 
-def get_tpxo_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
+def get_tpxo7_on_grid(filenames,lonr,latr,itide=0,return_ellipse=False,grang=None):
+    """ read TPXO7.2 files (filenames=[u-file,grid-file]) and interpolate it on lonr, latr grid
+    if return_ellipse is True: ellipse components (SEMA, SEMI, INC, PHA -- angles in radian), 
+    otherwise return amplitude, phase for u, v
+    if grang != None, rotate field by angle grang """
+    uname, hname = filenames
+    
+    nc = Dataset(uname,'r')
+    latu = nc.variables['lat_u'][:]
+    lonu = nc.variables['lon_u'][:]
+    latv = nc.variables['lat_v'][:]
+    lonv = nc.variables['lon_v'][:]
+    nc.close()
+    #lonu[lonu>180] -= 360
+    #lonv[lonv>180] -= 360
+ 
+    # Figure out if grid is regular (expect yes)
+    i1 = np.argmin(np.abs(lonu-(lonr%360).min()),axis=0).min()-1  # grid must be sorted ascent
+    i2 = np.argmin(np.abs(lonu-(lonr%360).max()),axis=0).max()+1
+    j1 = np.argmin(np.abs(latu-(latr).min()),axis=1).min()-1
+    j2 = np.argmin(np.abs(latu-(latr).max()),axis=1).max()+1
+    lonu = lonu[i1:i2,j1:j2]
+    latu = latu[i1:i2,j1:j2]
+    prov, cnt = np.unique(lonu,return_counts=True)
+    okx = len(prov) == lonu.shape[0] and (cnt==lonu.shape[1]).all()
+    prov, cnt = np.unique(latu,return_counts=True)
+    oky = len(prov) == latu.shape[1] and (cnt==latu.shape[0]).all()
+    if okx and oky:
+        indxu = slice(i1,i2)
+        indyu = slice(j1,j2)
+        lonu = lonu[:,0]
+        latu = latu[0,:]
+    else:
+        raise ValueError('grid is not regular. Case not implemented')
+    i1 = np.argmin(np.abs(lonv-(lonr%360).min()),axis=0).min()-1  
+    i2 = np.argmin(np.abs(lonv-(lonr%360).max()),axis=0).max()+1
+    j1 = np.argmin(np.abs(latv-(latr).min()),axis=1).min()-1
+    j2 = np.argmin(np.abs(latv-(latr).max()),axis=1).max()+1
+    lonv = lonv[i1:i2,j1:j2]
+    latv = latv[i1:i2,j1:j2]
+    prov, cnt = np.unique(lonv,return_counts=True)
+    okx = len(prov) == lonv.shape[0] and (cnt==lonv.shape[1]).all()
+    prov, cnt = np.unique(latv,return_counts=True)
+    oky = len(prov) == latv.shape[1] and (cnt==latv.shape[0]).all()
+    if okx and oky:
+        indxv = slice(i1,i2)
+        indyv = slice(j1,j2)
+        lonv = lonv[:,0]
+        latv = latv[0,:]
+    else:
+        raise ValueError('grid is not regular. Case not implemented')
+    
+    nc = Dataset(hname,'r')
+    hu = nc.variables['hu'][indxu,indyu]
+    hv = nc.variables['hv'][indxv,indyv]
+    nc.close()
+
+    nc = Dataset(uname,'r')
+    ure = nc.variables['URe'][itide,indxu,indyu]/hu    # cm²/s to m/s
+    vre = nc.variables['VRe'][itide,indxv,indyv]/hv
+    uim = nc.variables['UIm'][itide,indxu,indyu]/hu
+    vim = nc.variables['VIm'][itide,indxv,indyv]/hv
+    nc.close()
+
+    ure[~np.isfinite(ure)] = 0.
+    vre[~np.isfinite(vre)] = 0.
+    uim[~np.isfinite(uim)] = 0.
+    vim[~np.isfinite(vim)] = 0.
+    
+    ure = interp.RectBivariateSpline(lonu, latu, ure).ev(lonr%360,latr) # z.shape = (x.size, y.size)
+    vre = interp.RectBivariateSpline(lonv, latv, vre).ev(lonr%360,latr)
+    uim = interp.RectBivariateSpline(lonu, latu, uim).ev(lonr%360,latr)
+    vim = interp.RectBivariateSpline(lonv, latv, vim).ev(lonr%360,latr)
+    
+    if return_ellipse:
+        ua, up = cmp2ap(ure,uim)
+        va, vp = cmp2ap(vre,vim)
+        sema, ecc, inc, pha = ellipse(ua,up,va,vp)    # that is really sema, ecc, inc, pha
+        inc, pha = np.deg2rad(inc), np.deg2rad(pha)
+        if grang is not None:
+            inc += grang
+        return sema, ecc*sema, inc, pha
+    else:
+        if grang is not None:
+            ure, vre = rot_uv(ure,vre,grang)
+            uim, vim = rot_uv(uim,vim,grang)
+        ua, up = cmp2ap(ure,uim)
+        va, vp = cmp2ap(vre,vim)
+        return ua, up, va, vp
+ 
+
+def get_tpxo8_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
     """ read TPXO8 files (filenames=[ufile,hfile]) and interpolate it on lonr, latr grid
     if return_ellipse is True: ellipse components (SEMA, SEMI, INC, PHA -- angles in radian), 
     otherwise return amplitude, phase for u, v
@@ -111,12 +202,12 @@ def get_tpxo_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
         sema, ecc, inc, pha = ellipse(ua,up,va,vp)    # that is really sema, ecc, inc, pha
         inc, pha = np.deg2rad(inc), np.deg2rad(pha)
         if grang is not None:
-            va -= grang
+            va += grang
         return sema, ecc*sema, inc, pha
     else:
         if grang is not None:
             ure, vre = rot_uv(ure,vre,grang)
-            uim, vim = rot_uv(uim, vim, grang)
+            uim, vim = rot_uv(uim, vim,grang)
         ua, up = cmp2ap(ure,uim)
         va, vp = cmp2ap(vre,vim)
         return ua, up, va, vp
