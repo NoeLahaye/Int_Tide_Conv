@@ -140,7 +140,7 @@ def get_tpxo7_on_grid(filenames,lonr,latr,itide=0,return_ellipse=False,grang=Non
         sema, ecc, inc, pha = ellipse(ua,up,va,vp)    # that is really sema, ecc, inc, pha
         inc, pha = np.deg2rad(inc), np.deg2rad(pha)
         if grang is not None:
-            inc += grang
+            inc += grang    # is this correct ?
         return sema, ecc*sema, inc, pha
     else:
         if grang is not None:
@@ -202,7 +202,7 @@ def get_tpxo8_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
         sema, ecc, inc, pha = ellipse(ua,up,va,vp)    # that is really sema, ecc, inc, pha
         inc, pha = np.deg2rad(inc), np.deg2rad(pha)
         if grang is not None:
-            va += grang
+            va += grang    # is this correct ?
         return sema, ecc*sema, inc, pha
     else:
         if grang is not None:
