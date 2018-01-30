@@ -226,7 +226,7 @@ if N2_tmp[-1]==0: N2_tmp[-1] = 1e-8
 indneg, = np.where(N2_tmp<=0.)
 for ii in indneg:
     N2_tmp[ii] = (N2_tmp[ii-1] + N2_tmp[ii+1])/2
-fN2 = interp.pchip(zz[::-1],N2_tmp,extrapolate=True)    
+fN2 = interp.pchip(zz[::-1],N2_tmp[::-1],extrapolate=True)    
 
 
 # fit exponential profile
