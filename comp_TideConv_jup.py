@@ -198,7 +198,7 @@ if clim == "lucky":
 rho = np.sort(rhop(T,S)) #SW_Density(T,S) # sorting is cheating here
 rho0 = rho.mean()
 frho = itp.pchip(zz[::-1],rho[::-1],extrapolate=True)
-N2_tmp = -(g/rho0)*(2*np.pi)**2*frho.derivative()(zz)    # # has to be in [(rad s-1)^2]
+N2_tmp = -(g/rho0)*frho.derivative()(zz)    # # has to be in [(rad s-1)^2]
 indneg, = np.where(N2_tmp<=0.)
 for ii in indneg:
     N2_tmp[ii] = (N2_tmp[ii-1] + N2_tmp[ii+1])/2
@@ -207,7 +207,7 @@ nz      = N2_tmp.shape[0]
 
 # fit exponential profile
 slope,intercept,r_val,p_val,std_err = stats.linregress(zz,np.log(N2_tmp**0.5))
-N0  = np.exp(intercept)/(2*np.pi)
+N0  = np.exp(intercept)
 b   = 1./slope
 
 if doverb:
@@ -325,17 +325,17 @@ for j in range(nlat): #[nlat//2]: #
         
         # --- compute Ef(K,theta) ---
         coef = 0.5*rho0*((N2b[i,j]-M2**2)*(M2**2-f[i,j]**2))**0.5/M2
-        #Ef[j,i,:,:] = coef*gamma                                        # case 1  
-        Ef = coef*gamma                                                  # case 2 
+        #Ef[j,i,:,:] = coef*gamma                                       # case 1  
+        Ef = coef*gamma                                                 # case 2 
 
         # --- azimuthal integration [0,2pi] ---
         dtheta = theta[1] - theta[0] 
  
-        #Ef_a = np.zeros(nx) # temp variable                             # case 1
+        #Ef_a = np.zeros(nx) # temp variable                            # case 1
         #for k in np.arange(nxout): 
-            #Ef_a[k] = np.nansum(Ef[j,i,k,:]*kh[j,i,k]*dtheta)/(2*np.pi) # case 1 
-            #Ef_a[j,i,k] = np.nansum(Ef[k,:]*kh[j,i,k]*dtheta)/(2*np.pi)  # case 2 
-        Ef_a = np.nansum(Ef*dtheta,axis=1)*kh/(2*np.pi)
+            #Ef_a[k] = np.nansum(Ef[j,i,k,:]*kh[j,i,k]*dtheta)          # case 1 
+            #Ef_a[j,i,k] = np.nansum(Ef[k,:]*kh[j,i,k]*dtheta)          # case 2 
+        Ef_a = np.nansum(Ef*dtheta,axis=1)*kh
 
         # --- equivalent mode number Eq (6) in StL and G 2002 ---  
         #kj = np.arange(nmodes)*np.pi/np.nanmean(-h_1d)*alpha # Eq (4) -> less robust  
