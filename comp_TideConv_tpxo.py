@@ -421,7 +421,7 @@ for j in range(nlat): #
 
         # --- azimuthal integration [0,2pi] ---
         dtheta = theta[1] - theta[0] 
-        Ef_a = np.nansum(Ef*dtheta,axis=1)*kh/(2*np.pi)
+        Ef_a = np.nansum(Ef*dtheta,axis=1)*kh
 
         # --- equivalent mode number Eq (6) in StL and G 2002 ---  
         #k1 = np.pi*(M2**2-f[i,j]**2)**0.5/(b*N0) # Eq (6), H neglected
