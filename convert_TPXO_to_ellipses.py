@@ -151,10 +151,13 @@ def get_tpxo7_on_grid(filenames,lonr,latr,itide=0,return_ellipse=False,grang=Non
         return ua, up, va, vp
  
 
-def get_tpxo8_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
+def get_tpxo8_on_grid(filenames,lonr,latr,return_what="ap",return_ellipse=False,grang=None):
     """ read TPXO8 files (filenames=[ufile,hfile]) and interpolate it on lonr, latr grid
-    if return_ellipse is True: ellipse components (SEMA, SEMI, INC, PHA -- angles in radian), 
+    if return_what="ellipse": ellipse components (SEMA, SEMI, INC, PHA -- angles in radian), 
+    elif return="ap" (default): return amplitude, phase
+    elif return="comp": return complex components
     otherwise return amplitude, phase for u, v
+    return_ellipse retained for backward compatibility
     if grang != None, rotate field by angle grang """
     uname, hname = filenames
 
@@ -208,7 +211,10 @@ def get_tpxo8_on_grid(filenames,lonr,latr,return_ellipse=False,grang=None):
         if grang is not None:
             ure, vre = rot_uv(ure,vre,grang)
             uim, vim = rot_uv(uim, vim,grang)
-        ua, up = cmp2ap(ure,uim)
-        va, vp = cmp2ap(vre,vim)
-        return ua, up, va, vp
+        if return_what == "ap":
+            ua, up = cmp2ap(ure,uim)
+            va, vp = cmp2ap(vre,vim)
+            return ua, up, va, vp
+        else:
+            return ure, uim, vre, vim
  
